@@ -13,10 +13,12 @@ const Autocomplete: FC = () => {
   const [searchTerm, setSearchTem] = useState<string>("")
   const [issues, setIssues] = useState<Issue[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [isOpen, setIsOpen] = useState<boolean>(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [shouldShowResults, setShouldShowResults] = useState<boolean>(false)
   const [focusIndex, setFocusIndex] = useState<number>(-1)
+
+  const inputSearchRef = useRef<HTMLInputElement>(null)
   let searchResultRefs = React.useRef(new Map())
+
   const MAX_RESULTS = 5;
 
   enum KEY {
@@ -29,28 +31,23 @@ const Autocomplete: FC = () => {
     registerGlobalShortcuts()
   }, [])
 
-  function reset() {
-    setIssues([])
+  function resetState() {
     setIsLoading(false)
     setFocusIndex(-1)
     searchResultRefs.current.clear()
   }
 
   const containerRef = useRef<HTMLDivElement>(null);
-  useOnClickOutside(containerRef, () => setIsOpen(false));
+  useOnClickOutside(containerRef, () => setShouldShowResults(false));
 
   async function searchIssues() {
-    if (!searchTerm) {
-      reset()
-      return
-    }
     try {
-      console.log(searchResultRefs.current)
       searchResultRefs.current.clear()
       const response = await fetch(`http://localhost:3001/issues?q=${searchTerm}`)
-      const issuesResponse: Issue[] = await response.json();
+      let issuesResponse: Issue[] = await response.json();
+      issuesResponse = issuesResponse.slice(0, MAX_RESULTS);
       setIssues(issuesResponse)
-      setIsOpen(issuesResponse.length > 0)
+      setShouldShowResults(issuesResponse.length > 0)
     } catch (error) {
       console.log(error)
     } finally {
@@ -61,10 +58,10 @@ const Autocomplete: FC = () => {
 
   function registerGlobalShortcuts() {
     document.onkeyup = ({ key: pressedKey }) => {
-      const isInputFocused = document.activeElement === inputRef.current
+      const isInputFocused = document.activeElement === inputSearchRef.current
       const shouldFocusInput = pressedKey === "/" && !isInputFocused
-      if (shouldFocusInput && inputRef.current) {
-        inputRef.current.focus()
+      if (shouldFocusInput && inputSearchRef.current) {
+        inputSearchRef.current.focus()
       }
     }
   }
@@ -88,7 +85,7 @@ const Autocomplete: FC = () => {
     if (pressedKey === KEY.ARROW_UP) {
       const isFirstResult = (focusIndex - 1) === -1;
       if (isFirstResult) {
-        inputRef.current?.focus()
+        inputSearchRef.current?.focus()
         setFocusIndex(focusIndex - 1)
         return
       }
@@ -108,13 +105,18 @@ const Autocomplete: FC = () => {
     }
   }
 
-  const debouncedSearch = useDebouncedCallback(() => searchIssues(), 0)
+  const lazySearch = useDebouncedCallback(() => searchIssues(), 3000)
 
   function handleSearchChange(search: string) {
     setSearchTem(search)
     setIssues([])
+    if (!search) {
+      resetState()
+      return
+    }
+
     setIsLoading(true)
-    debouncedSearch()
+    lazySearch()
   }
 
   return (
@@ -124,25 +126,27 @@ const Autocomplete: FC = () => {
         type="search"
         placeholder="Search..."
         onChange={(event) => handleSearchChange(event.target.value)}
-        ref={inputRef}
-        onFocus={() => setIsOpen(true)}
+        ref={inputSearchRef}
+        onFocus={() => setShouldShowResults(true)}
         onKeyDown={(e) => handleKeyUp(e)}
         tabIndex={1}
       />
 
-      <div className={`search-container ${!isOpen ? 'hidden' : ''}`}>
-        {isLoading && (<div className="search-result">
-          Is loading...
-        </div>)
-        }
+      <div className={`search-container ${!shouldShowResults ? 'hidden' : ''}`}>
+        {isLoading && (<div className="search-result-card">
+          <div className="d-flex justify-content-center">
+            <div className="spinner-border" role="status">
+              <span className="sr-only">Loading...</span>
+            </div>
+          </div>
+        </div>
+        )}
 
         {issues.map((issue: Issue, index: number) => (
           <div tabIndex={index + 2} className="search-result" key={issue.id} ref={el => searchResultRefs.current.set(issue, el)} onKeyDown={(e) => handleKeyUp(e)}>
             <div>
               <div className="search-result__header-icon">
-                {
-                  issue.state === 'open' ? <IssueOpened /> : <IssueClosed />
-                }
+                {issue.state === 'open' ? <IssueOpened /> : <IssueClosed />}
               </div>
             </div>
             <div className="right-side">
@@ -171,8 +175,7 @@ const Autocomplete: FC = () => {
               </div>
             </div>
           </div>
-        ))
-        }
+        ))}
       </div>
     </div>
   )

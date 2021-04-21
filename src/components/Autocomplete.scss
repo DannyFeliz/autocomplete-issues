@@ -17,6 +17,13 @@
     flex-direction: column;
     position: absolute;
     width: 100%;
+
+    .search-result-card {
+      border-radius: 8px !important;
+      background-color: white;
+      padding: 10px 5px;
+      border: 1px #cecece solid;
+    }
   }
 
   .search-result {
@@ -75,7 +82,7 @@
     }
 
     &__meta {
-      margin: 6px 0;
+      margin: 2px 0;
       color: #586069;
     }
   }
