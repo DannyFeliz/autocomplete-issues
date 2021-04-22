@@ -77,8 +77,7 @@ const Autocomplete: FC = () => {
     try {
       searchResultRefs.current.clear()
 
-      // const response = await fetch(`http://localhost:3001/issues?q=${searchTerm}`)
-      const response = await fetch(`http://localhost:3002/issues?${buildSearchQuery()}`)
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/issues?${buildSearchQuery()}`)
       let issuesResponse: Issue[] = await response.json()
       setIssues(issuesResponse)
       setShouldShowResults(issuesResponse.length > 0)
@@ -192,7 +191,7 @@ const Autocomplete: FC = () => {
               <div className="right-side">
                 <div className="search-result__header">
                   <div className="search-result__header-title">
-                    <a href={issue.html_url} target="_blank">{issue.title}</a>
+                    <a href={issue.html_url}>{issue.title}</a>
                   </div>
                   <div className="search-result__header-meta">
                     {issue.comments > 0 && (
@@ -207,7 +206,7 @@ const Autocomplete: FC = () => {
                 </div>
                 <div className="search-result__meta">
                   #{issue.number} opened {format(issue.created_at)} by{" "}
-                  <a href={`http://github.com/${issue.user.login}`}>{issue.user.login}</a>{" "}
+                  <a href={issue.user.html_url}>{issue.user.login}</a>{" "}
              — Updated {format(issue.updated_at)}
                 </div>
                 <div className="search-result__labels">
