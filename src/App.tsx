@@ -1,11 +1,8 @@
 import React, { useState } from 'react'
-import logo from './logo.svg'
-import './App.css'
+import './App.scss'
 import Autocomplete from "./components/Autocomplete";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
     <main className="container">
       <h1>Autocomplet Github Issues</h1>
