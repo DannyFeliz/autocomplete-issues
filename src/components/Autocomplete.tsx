@@ -2,12 +2,13 @@ import React, { FC, useEffect, useRef, useState } from 'react'
 import IssueClosed from "./IssueClosedIcon"
 import IssueOpened from "./IssueOpenedIcon"
 import Comment from "./CommentIcon"
-import { Issue } from '../types'
+import { FiltersProps, Issue } from '../types'
 import { format } from "timeago.js"
 import Labels from './Labels'
 import "./Autocomplete.scss"
 import { useDebouncedCallback } from 'use-debounce'
 import { useOnClickOutside } from '../hooks'
+import Filters from './Filters'
 
 const Autocomplete: FC = () => {
   const [searchTerm, setSearchTem] = useState<string>("")
@@ -19,7 +20,12 @@ const Autocomplete: FC = () => {
   const inputSearchRef = useRef<HTMLInputElement>(null)
   let searchResultRefs = React.useRef(new Map())
 
-  const MAX_RESULTS = 5;
+  const [filters, setFilters] = useState({
+    limit: 3,
+    order: "asc",
+    state: "open",
+    labels: ""
+  })
 
   enum KEY {
     ENTER = "Enter",
@@ -31,21 +37,34 @@ const Autocomplete: FC = () => {
     registerGlobalShortcuts()
   }, [])
 
+  useEffect(() => {
+    setIsLoading(false)
+    searchIssues()
+  }, [filters])
+
   function resetState() {
     setIsLoading(false)
     setFocusIndex(-1)
     searchResultRefs.current.clear()
   }
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  useOnClickOutside(containerRef, () => setShouldShowResults(false));
+  const containerRef = useRef<HTMLDivElement>(null)
+  useOnClickOutside(containerRef, () => {
+    setShouldShowResults(false)
+    setFocusIndex(-1)
+  })
 
   async function searchIssues() {
+    if (!searchTerm) {
+      return;
+    }
     try {
       searchResultRefs.current.clear()
-      const response = await fetch(`http://localhost:3001/issues?q=${searchTerm}`)
-      let issuesResponse: Issue[] = await response.json();
-      issuesResponse = issuesResponse.slice(0, MAX_RESULTS);
+      const query = `q=${searchTerm}&order=${filters.order}&state=${filters.state}&per_page=${filters.limit}`
+
+      // const response = await fetch(`http://localhost:3001/issues?q=${searchTerm}`)
+      const response = await fetch(`http://localhost:3002/issues?${query}`)
+      let issuesResponse: Issue[] = await response.json()
       setIssues(issuesResponse)
       setShouldShowResults(issuesResponse.length > 0)
     } catch (error) {
@@ -77,32 +96,36 @@ const Autocomplete: FC = () => {
     }
 
 
-    if (pressedKey === KEY.ENTER) {
+    if (pressedKey === KEY.ENTER && getSearchResultRef(focusIndex)) {
       window.location.href = issues[focusIndex].html_url
       return
     }
 
     if (pressedKey === KEY.ARROW_UP) {
-      const isFirstResult = (focusIndex - 1) === -1;
+      const isFirstResult = (focusIndex - 1) === -1
       if (isFirstResult) {
         inputSearchRef.current?.focus()
         setFocusIndex(focusIndex - 1)
         return
       }
 
-      if (searchResultRefs.current.get(issues[focusIndex - 1])) {
-        searchResultRefs.current.get(issues[focusIndex - 1]).focus()
+      if (getSearchResultRef(focusIndex - 1)) {
+        getSearchResultRef(focusIndex - 1).focus()
         setFocusIndex(focusIndex - 1)
         return
       }
     }
 
     if (pressedKey === KEY.ARROW_DOWN) {
-      if (searchResultRefs.current.get(issues[focusIndex + 1])) {
-        searchResultRefs.current.get(issues[focusIndex + 1]).focus()
+      if (getSearchResultRef(focusIndex + 1)) {
+        getSearchResultRef(focusIndex + 1).focus()
         setFocusIndex(focusIndex + 1)
       }
     }
+  }
+
+  function getSearchResultRef(index: number): HTMLDivElement {
+    return searchResultRefs.current.get(issues[index])
   }
 
   const lazySearch = useDebouncedCallback(() => searchIssues(), 3000)
@@ -121,6 +144,7 @@ const Autocomplete: FC = () => {
 
   return (
     <div className="autocomplete-container" ref={containerRef}>
+      <Filters {...filters} filterUpdater={setFilters} />
       <input
         className="form-control"
         type="search"

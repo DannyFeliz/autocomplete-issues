@@ -65,3 +65,10 @@ export interface Issue {
     performed_via_github_app?: any;
 }
 
+export interface FiltersProps {
+  filters: {
+    status: "open" | "close";
+    sort: "desc" | "asc";
+    limit: number
+  }
+}
