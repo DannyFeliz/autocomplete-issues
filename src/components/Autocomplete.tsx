@@ -22,7 +22,6 @@ const Autocomplete: FC = () => {
 
   const [filters, setFilters] = useState({
     limit: 3,
-    order: "asc",
     state: "open",
     labels: ""
   })
@@ -39,7 +38,7 @@ const Autocomplete: FC = () => {
 
   useEffect(() => {
     setIsLoading(false)
-    searchIssues()
+    lazySearch()
   }, [filters])
 
   function resetState() {
@@ -48,22 +47,38 @@ const Autocomplete: FC = () => {
     searchResultRefs.current.clear()
   }
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  useOnClickOutside(containerRef, () => {
+  function buildSearchQuery(): string {
+    let query = `q=${searchTerm}`
+
+    if (filters.labels) {
+      query += filters.labels.split(",").filter(Boolean).map(label => `label:"${label}"`).join(" ")
+    }
+
+    if (filters.state) {
+      query += `&state=${filters.state}`
+    }
+
+    if (filters.limit) {
+      query += `&per_page=${filters.limit}`
+    }
+
+    return query;
+  }
+
+  useOnClickOutside(inputSearchRef, () => {
     setShouldShowResults(false)
     setFocusIndex(-1)
   })
 
   async function searchIssues() {
     if (!searchTerm) {
-      return;
+      return
     }
     try {
       searchResultRefs.current.clear()
-      const query = `q=${searchTerm}&order=${filters.order}&state=${filters.state}&per_page=${filters.limit}`
 
       // const response = await fetch(`http://localhost:3001/issues?q=${searchTerm}`)
-      const response = await fetch(`http://localhost:3002/issues?${query}`)
+      const response = await fetch(`http://localhost:3002/issues?${buildSearchQuery()}`)
       let issuesResponse: Issue[] = await response.json()
       setIssues(issuesResponse)
       setShouldShowResults(issuesResponse.length > 0)
@@ -128,7 +143,7 @@ const Autocomplete: FC = () => {
     return searchResultRefs.current.get(issues[index])
   }
 
-  const lazySearch = useDebouncedCallback(() => searchIssues(), 3000)
+  const lazySearch = useDebouncedCallback(() => searchIssues(), 350)
 
   function handleSearchChange(search: string) {
     setSearchTem(search)
@@ -143,65 +158,67 @@ const Autocomplete: FC = () => {
   }
 
   return (
-    <div className="autocomplete-container" ref={containerRef}>
+    <>
       <Filters {...filters} filterUpdater={setFilters} />
-      <input
-        className="form-control"
-        type="search"
-        placeholder="Search..."
-        onChange={(event) => handleSearchChange(event.target.value)}
-        ref={inputSearchRef}
-        onFocus={() => setShouldShowResults(true)}
-        onKeyDown={(e) => handleKeyUp(e)}
-        tabIndex={1}
-      />
+      <div className="autocomplete-container" ref={inputSearchRef}>
+        <input
+          className="form-control"
+          type="search"
+          placeholder="Search..."
+          onChange={(event) => handleSearchChange(event.target.value)}
+          ref={inputSearchRef}
+          onFocus={() => setShouldShowResults(true)}
+          onKeyDown={(e) => handleKeyUp(e)}
+          tabIndex={1}
+        />
 
-      <div className={`search-container ${!shouldShowResults ? 'hidden' : ''}`}>
-        {isLoading && (<div className="search-result-card">
-          <div className="d-flex justify-content-center">
-            <div className="spinner-border" role="status">
-              <span className="sr-only">Loading...</span>
+        <div className={`search-container ${!shouldShowResults ? 'hidden' : ''}`}>
+          {isLoading && (<div className="search-result-card">
+            <div className="d-flex justify-content-center">
+              <div className="spinner-border" role="status">
+                <span className="sr-only">Loading...</span>
+              </div>
             </div>
           </div>
-        </div>
-        )}
+          )}
 
-        {issues.map((issue: Issue, index: number) => (
-          <div tabIndex={index + 2} className="search-result" key={issue.id} ref={el => searchResultRefs.current.set(issue, el)} onKeyDown={(e) => handleKeyUp(e)}>
-            <div>
-              <div className="search-result__header-icon">
-                {issue.state === 'open' ? <IssueOpened /> : <IssueClosed />}
-              </div>
-            </div>
-            <div className="right-side">
-              <div className="search-result__header">
-                <div className="search-result__header-title">
-                  <a href={issue.html_url} target="_blank">{issue.title}</a>
-                </div>
-                <div className="search-result__header-meta">
-                  {issue.comments > 0 && (
-                    <span>
-                      <a href={`${issue.html_url}#partial-timeline`}>
-                        <span>{issue.comments}</span>
-                        <Comment />
-                      </a>
-                    </span>
-                  )}
+          {issues.map((issue: Issue, index: number) => (
+            <div tabIndex={index + 2} className="search-result" key={issue.id} ref={el => searchResultRefs.current.set(issue, el)} onKeyDown={(e) => handleKeyUp(e)}>
+              <div>
+                <div className="search-result__header-icon">
+                  {issue.state === 'open' ? <IssueOpened /> : <IssueClosed />}
                 </div>
               </div>
-              <div className="search-result__meta">
-                #{issue.number} opened {format(issue.created_at)} by{" "}
-                <a href={`http://github.com/${issue.user.login}`}>{issue.user.login}</a>{" "}
+              <div className="right-side">
+                <div className="search-result__header">
+                  <div className="search-result__header-title">
+                    <a href={issue.html_url} target="_blank">{issue.title}</a>
+                  </div>
+                  <div className="search-result__header-meta">
+                    {issue.comments > 0 && (
+                      <span>
+                        <a href={`${issue.html_url}#partial-timeline`}>
+                          <span>{issue.comments}</span>
+                          <Comment />
+                        </a>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="search-result__meta">
+                  #{issue.number} opened {format(issue.created_at)} by{" "}
+                  <a href={`http://github.com/${issue.user.login}`}>{issue.user.login}</a>{" "}
              — Updated {format(issue.updated_at)}
-              </div>
-              <div className="search-result__labels">
-                <Labels labels={issue.labels || []}></Labels>
+                </div>
+                <div className="search-result__labels">
+                  <Labels labels={issue.labels || []}></Labels>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   )
 }
 

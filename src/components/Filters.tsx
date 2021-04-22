@@ -3,14 +3,13 @@ import "./Filters.scss";
 
 interface FiltersProps {
   state: string;
-  order: string;
   limit: number;
   labels?: string;
   filterUpdater: Function
 }
 
 const Filters: FC<FiltersProps> = (props) => {
-  const { state, order, limit, labels, filterUpdater } = props;
+  const { state, limit, labels, filterUpdater } = props;
 
   function handleChange(filter: any) {
     filterUpdater({ ...props, ...filter })
@@ -29,14 +28,6 @@ const Filters: FC<FiltersProps> = (props) => {
           >
             <option value="open">Open</option>
             <option value="closed">Closed</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="order">Order</label>
-          <select value={order} id="order" className="form-control" onChange={(event => handleChange({ order: event.target.value }))}>
-            <option value="asc">Asc</option>
-            <option value="desc">Desc</option>
           </select>
         </div>
 
